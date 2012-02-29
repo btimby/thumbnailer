@@ -52,7 +52,7 @@ the server incurs the startup cost only once and is able to quickly generate thu
 
 The conversion server can receive jobs via either a POST or GET request.
 
-A POST is expected to provide a Content-Type header indicated the document format. The request
+A POST is expected to provide a Content-Type header indicateing the document format. The request
 body should contain the document itself.
 
 A GET request should provide a URL that is accessible to the conversion server. That is, the URL
@@ -64,13 +64,16 @@ The following flow illustrates what happens within the conversion server in resp
 POST or GET request.
 
 POST only:
+
 - The document content (POST body) is written to a temporary file.
 
 GET only:
+
 - If the URL is a network location, the document content is fetched and written to a temporary
 file. For a file:// URL, this step is skipped.
 
 POST or GET:
+
 - The document is submitted to the office suite for conversion to PDF.
 - The PDF file is provided to ghostscript for conversion to PNG.
 - The PNG file is returned to the caller.
