@@ -25,12 +25,12 @@ combination of several backends to create the thumbnail.
 If for some reason, you want more control over what backend is used, you can instantiate a backend
 and use it directly.
 
-{{{python
+`python
 from thumbnailer import library as thumb
 
 backend = thumb.OfficeBackend()
 backend.create('path_to.docx')
-}}}
+`
 
 There are three backends.
 
