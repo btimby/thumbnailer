@@ -13,11 +13,11 @@ If you are only creating one thumbnail, you can use the library directly. The st
 high, so if you are creating more than one thumbnail, read the next section about the conversion
 server.
 
-{{{python
+```python
 from thumbnailer import library as thumb
 
 thumb.create('path_to.png')
-}}}
+```
 
 The create function will detect the file type and create a thumbnail for it. It will use one or a
 combination of several backends to create the thumbnail.
@@ -25,12 +25,12 @@ combination of several backends to create the thumbnail.
 If for some reason, you want more control over what backend is used, you can instantiate a backend
 and use it directly.
 
-`python
+```python
 from thumbnailer import library as thumb
 
 backend = thumb.OfficeBackend()
 backend.create('path_to.docx')
-`
+```
 
 There are three backends.
 
