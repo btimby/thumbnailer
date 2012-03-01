@@ -1,9 +1,7 @@
 import os, subprocess, tempfile, shutil
 from PIL import Image
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from . import unoclient
+from .compat import StringIO
 
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 128, 128
 GS_ARGS = (
@@ -17,13 +15,17 @@ GS_ARGS = (
     '-dFirstPage=1',
     '-dLastPage=1',
 )
+"Default arguments used with GhostScript."
 FF_ARGS = (
     'ffmpeg',
     '-vframes', '1',
     '-ss', '1',
 )
+"Default arguments used with ffmpeg."
 
 def create(f, **kwargs):
+    """A convenience function to determine the correct backend, instantiate
+    it, then ask it to create a thumbnail."""
     if isinstance(f, basestring):
         ext = os.path.splitext(f)[1]
     else:
@@ -39,6 +41,8 @@ def create(f, **kwargs):
 
 
 class ImageBackend(object):
+    """A backend that uses the PIL library to resize an image to the requested
+    dimensions."""
     def __init__(self, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
         self.width = width
         self.height = height
@@ -53,6 +57,8 @@ class ImageBackend(object):
 
 
 class VideoBackend(ImageBackend):
+    """A backend that uses the ffmpeg command to grab the first frame of a video
+    to an image. That image is then sent upstream to the ImageBackend for resizing."""
     def create(self, f):
         args = list(FF_ARGS)
         if isinstance(f, basestring):
@@ -69,6 +75,8 @@ class VideoBackend(ImageBackend):
 
 
 class PdfBackend(ImageBackend):
+    """A backend that uses GhostScript to convert the first page of a PDF into
+    an image. That image is then sent upstream to the ImageBackend for resizing."""
     def create(self, f):
         args = list(GS_ARGS)
         if not isinstance(f, basestring):
@@ -85,15 +93,12 @@ class PdfBackend(ImageBackend):
 
 
 class OfficeBackend(PdfBackend):
+    """A backend that communicates with OO.o/LibreOffice via UNO. The office suite
+    converts the document to a PDF, which is then sent upstream to the PdfBackend
+    for conversion to an image."""
     def __init__(self, connection=None, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
-        from . import unoclient
         super(OfficeBackend, self).__init__(width, height)
-        if connection is None:
-            connection = os.environ.get('UNO_CONNECTION', None)
-        if connection is None:
-            raise Exception('You must provide the UNO connection information. Either use the ' \
-                            'connection kwarg, or set the UNO_CONNECTION environment variable.')
-        self.client = unoclient.Client(connection)
+        self.client = unoclient.client(connection)
 
     def create(self, f):
         if not isinstance(f, basestring):
@@ -130,3 +135,4 @@ BACKEND_SUPPORT = {
         '.rtf', '.txt', '.pxl'
     )
 }
+"Maps backends to the file extensions they support."

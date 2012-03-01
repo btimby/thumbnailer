@@ -1,15 +1,13 @@
+import os, random, threading
 try:
-    import os, uno
+    import uno
     from unohelper import Base, systemPathToFileUrl
     from com.sun.star.beans import PropertyValue
     from com.sun.star.connection import NoConnectException
     from com.sun.star.io import IOException, XOutputStream
 except ImportError:
     raise Exception('Document thumbnailing requires OO.o/LibreOffice and python-uno')
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from .compat import StringIO
 
 # Taken from example:
 # http://www.openoffice.org/udk/python/samples/ooextract.py
@@ -23,6 +21,8 @@ except ImportError:
 # UNO_CONNECTION="uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext"
 
 class OutputStream( Base, XOutputStream ):
+    """A simple stream that is compatible with UNO XOutputStream and can
+    also return a StringIO object containing what was written to it."""
     def __init__(self):
         self.closed = 0
         self.stream = StringIO()
@@ -42,6 +42,7 @@ class OutputStream( Base, XOutputStream ):
 
 
 class Client(object):
+    """An UNO client."""
     def __init__(self, connection):
         context = uno.getComponentContext()
         manager = context.ServiceManager
@@ -79,3 +80,56 @@ class Client(object):
             if document:
                 document.dispose()
         return stream
+
+    def close(self):
+        pass
+
+
+class PooledClient(Client):
+    """An UNO client that is able to track if it is in use or not."""
+    def __init__(self, pool, connection):
+        super(PooledClient, self).__init__(connection)
+        self.pool = pool
+        self.in_use = threading.Event()
+
+    def close(self):
+        self.pool.lock.acquire()
+        try:
+            self.in_use.clear()
+        finally:
+            self.pool.lock.release()
+
+
+class Pool(object):
+    """Pools UNO clients, tracking when each is in use. New UNO clients
+    will be created as needed to fulfill requests."""
+    def __init__(self):
+        self.clients = {}
+        self.lock = threading.Lock()
+
+    def client(self, connection):
+        self.lock.acquire()
+        try:
+            clients = self.clients.get(connection, [])
+            clients = filter(lambda x: not x.in_use.is_set(), clients)
+            if not clients:
+                # No clients not already assigned...
+                clients.append(PooledClient(self, connection))
+            client = random.choice(clients)
+            client.in_use.set()
+            return client
+        finally:
+            self.lock.release()
+
+
+pool = Pool()
+"The default UNO client pool."
+
+def client(connection=None):
+    "Get an unused UNO client from the pool."
+    if connection is None:
+        connection = os.environ.get('UNO_CONNECTION', None)
+    if connection is None:
+        raise Exception('You must provide the UNO connection information. Either use the ' \
+                        'connection kwarg, or set the UNO_CONNECTION environment variable.')
+    return pool.client(connection)
