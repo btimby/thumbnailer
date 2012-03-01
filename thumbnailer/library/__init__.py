@@ -96,22 +96,20 @@ class OfficeBackend(PdfBackend):
     """A backend that communicates with OO.o/LibreOffice via UNO. The office suite
     converts the document to a PDF, which is then sent upstream to the PdfBackend
     for conversion to an image."""
-    def __init__(self, connection=None, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
-        super(OfficeBackend, self).__init__(width, height)
-        self.client = unoclient.client(connection)
-
     def create(self, f):
-        if not isinstance(f, basestring):
+        # Get an UNO client from the pool.
+        with unoclient.client() as client:
+            if not isinstance(f, basestring):
+                o, fname = tempfile.mkstemp()
+                try:
+                    with os.fdopen(o, 'w') as o:
+                        shutil.copyfileobj(f, o)
+                finally:
+                    f.close()
+                f = fname
             o, fname = tempfile.mkstemp()
-            try:
-                with os.fdopen(o, 'w') as o:
-                    shutil.copyfileobj(f, o)
-            finally:
-                f.close()
-            f = fname
-        o, fname = tempfile.mkstemp()
-        os.close(o)
-        pdf = self.client.export_to_pdf(f)
+            os.close(o)
+            pdf = client.export_to_pdf(f)
         return super(OfficeBackend, self).create(pdf.getStream())
 
 

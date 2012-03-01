@@ -1,4 +1,4 @@
-import os, random, threading
+import os, random, threading, time
 try:
     import uno
     from unohelper import Base, systemPathToFileUrl
@@ -86,11 +86,30 @@ class Client(object):
 
 
 class PooledClient(Client):
-    """An UNO client that is able to track if it is in use or not."""
+    """An UNO client that is able to track if it is in use or not. It is important that
+    any client obtained be closed by the caller. Otherwise, it will not be available for
+    reuse."""
     def __init__(self, pool, connection):
         super(PooledClient, self).__init__(connection)
         self.pool = pool
         self.in_use = threading.Event()
+        # Track usage, in the future, we may purge old/unused clients.
+        self.last_used = None
+
+    def __enter__(self):
+        return self.open()
+
+    def __exit__(self, *args):
+        self.close()
+
+    def open(self):
+        self.pool.lock.acquire()
+        try:
+            self.last_used = time.time()
+            self.in_use.set()
+        finally:
+            self.pool.lock.release()
+        return self
 
     def close(self):
         self.pool.lock.acquire()
@@ -104,8 +123,9 @@ class Pool(object):
     """Pools UNO clients, tracking when each is in use. New UNO clients
     will be created as needed to fulfill requests."""
     def __init__(self):
+        # Keep a dictionary of clients keyed on the office instance they connect to.
         self.clients = {}
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     def client(self, connection):
         self.lock.acquire()
@@ -116,7 +136,7 @@ class Pool(object):
                 # No clients not already assigned...
                 clients.append(PooledClient(self, connection))
             client = random.choice(clients)
-            client.in_use.set()
+            client.open()
             return client
         finally:
             self.lock.release()
@@ -126,7 +146,8 @@ pool = Pool()
 "The default UNO client pool."
 
 def client(connection=None):
-    "Get an unused UNO client from the pool."
+    "Get an unused UNO client from the default pool."
+    global pool
     if connection is None:
         connection = os.environ.get('UNO_CONNECTION', None)
     if connection is None:
