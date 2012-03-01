@@ -17,7 +17,6 @@ class ThumbnailerTestCase(unittest.TestCase):
         self.assertDimensions(t)
 
     def test_avi(self):
-        import pdb; pdb.set_trace()
         t = thumb.create('files/test.avi')
         self.assertDimensions(t)
 
