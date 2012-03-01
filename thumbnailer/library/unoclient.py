@@ -1,4 +1,4 @@
-import os, random, threading, time
+import os, sys, random, threading, time
 try:
     import uno
     from unohelper import Base, systemPathToFileUrl
@@ -12,13 +12,22 @@ from .compat import StringIO
 # Taken from example:
 # http://www.openoffice.org/udk/python/samples/ooextract.py
 
+SOFFICE_INSTRUCTIONS = """
 # To run in Foreground:
-# soffice --accept=socket,host=localhost,port=2002;urp;
+$ soffice --accept=socket,host=localhost,port=2002;urp;
+
 # To run headless:
-# soffice --accept=socket,host=localhost,port=2002;urp; --headless
+$ soffice --accept=socket,host=localhost,port=2002;urp; --headless --invisible --nocrashreport --nodefault --nofirststartwizard --nologo --norestore
 
 # Then set environment:
-# UNO_CONNECTION="uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext"
+$ export UNO_CONNECTION="uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext"
+"""
+
+def help(message):
+    print >> sys.stderr, message
+    print >> sys.stderr, SOFFICE_INSTRUCTIONS
+    raise SystemExit()
+
 
 class OutputStream( Base, XOutputStream ):
     """A simple stream that is compatible with UNO XOutputStream and can
@@ -53,7 +62,7 @@ class Client(object):
         try:
             context = resolver.resolve(connection)
         except NoConnectException:
-            raise Exception('Invalid UNO connection information')
+            help('Could not connect to soffice. Is it running?')
         manager = context.ServiceManager
         self.desktop = manager.createInstanceWithContext(
             'com.sun.star.frame.Desktop',
@@ -154,6 +163,5 @@ def client(connection=None):
     if connection is None:
         connection = os.environ.get('UNO_CONNECTION', None)
     if connection is None:
-        raise Exception('You must provide the UNO connection information. Either use the ' \
-                        'connection kwarg, or set the UNO_CONNECTION environment variable.')
+        help('No connection information provided.')
     return pool.client(connection)
