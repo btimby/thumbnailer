@@ -107,8 +107,7 @@ class OfficeBackend(PdfBackend):
         o, fname = tempfile.mkstemp()
         os.close(o)
         pdf = self.client.export_to_pdf(f)
-        pdf.seek(0)
-        return super(OfficeBackend, self).create(pdf.stream)
+        return super(OfficeBackend, self).create(pdf.getStream())
 
 
 BACKEND_SUPPORT = {

@@ -1,8 +1,11 @@
-import os, uno
-from unohelper import Base, systemPathToFileUrl
-from com.sun.star.beans import PropertyValue
-from com.sun.star.connection import NoConnectException
-from com.sun.star.io import IOException, XOutputStream
+try:
+    import os, uno
+    from unohelper import Base, systemPathToFileUrl
+    from com.sun.star.beans import PropertyValue
+    from com.sun.star.connection import NoConnectException
+    from com.sun.star.io import IOException, XOutputStream
+except ImportError:
+    raise Exception('Document thumbnailing requires OO.o/LibreOffice and python-uno')
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -20,20 +23,21 @@ except ImportError:
 # UNO_CONNECTION="uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext"
 
 class OutputStream( Base, XOutputStream ):
-    def __init__( self ):
+    def __init__(self):
         self.closed = 0
         self.stream = StringIO()
 
     def closeOutput(self):
         self.closed = 1
 
-    def writeBytes( self, seq ):
-        self.stream.write( seq.value )
+    def writeBytes(self, seq):
+        self.stream.write(seq.value)
 
-    def seek(self, off):
-        self.stream.seek(off)
+    def getStream(self):
+        self.stream.seek(0)
+        return self.stream
 
-    def flush( self ):
+    def flush(self):
         pass
 
 
