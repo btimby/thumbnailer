@@ -130,12 +130,15 @@ class Pool(object):
     def client(self, connection):
         self.lock.acquire()
         try:
-            clients = self.clients.get(connection, [])
-            clients = filter(lambda x: not x.in_use.is_set(), clients)
-            if not clients:
-                # No clients not already assigned...
-                clients.append(PooledClient(self, connection))
-            client = random.choice(clients)
+            clients = self.clients.setdefault(connection, [])
+            unused = filter(lambda x: not x.in_use.is_set(), clients)
+            if unused:
+                # Select a random unused client:
+                client = random.choice(unused)
+            else:
+                # Add a new client to the pool
+                client = PooledClient(self, connection)
+                clients.append(client)
             client.open()
             return client
         finally:
