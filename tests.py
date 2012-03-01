@@ -2,6 +2,7 @@ import unittest
 from PIL import Image
 from thumbnailer import library as thumb
 
+
 class ThumbnailerTestCase(unittest.TestCase):
     def assertDimensions(self, t):
         w, h = Image.open(t).size

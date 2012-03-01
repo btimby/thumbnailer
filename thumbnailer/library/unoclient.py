@@ -1,5 +1,5 @@
 import os, uno
-from unohelper import Base, systemPathToFileUrl, absolutize
+from unohelper import Base, systemPathToFileUrl
 from com.sun.star.beans import PropertyValue
 from com.sun.star.connection import NoConnectException
 from com.sun.star.io import IOException, XOutputStream
@@ -7,6 +7,9 @@ try:
     from cStringIO import StringIO
 except ImportError:
     from StringIO import StringIO
+
+# Taken from example:
+# http://www.openoffice.org/udk/python/samples/ooextract.py
 
 # To run in Foreground:
 # soffice --accept=socket,host=localhost,port=2002;urp;
@@ -51,7 +54,6 @@ class Client(object):
             'com.sun.star.frame.Desktop',
             context,
         )
-        self.cwd = systemPathToFileUrl(os.getcwd())
 
     def export_to_pdf(self, path):
         stream = OutputStream()
@@ -66,8 +68,8 @@ class Client(object):
         )
         document = None
         try:
-            fileUrl = absolutize(self.cwd, systemPathToFileUrl(path))
-            document = self.desktop.loadComponentFromURL(fileUrl, '_blank', 0, props_in)
+            pathUrl = systemPathToFileUrl(os.path.abspath(path))
+            document = self.desktop.loadComponentFromURL(pathUrl, '_blank', 0, props_in)
             document.storeToURL('private:stream', props_out)
         finally:
             if document:

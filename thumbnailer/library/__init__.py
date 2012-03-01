@@ -22,9 +22,6 @@ FF_ARGS = (
     '-vframes', '1',
     '-ss', '1',
 )
-UC_ARGS = (
-    'unoconv',
-)
 
 def create(f, **kwargs):
     if isinstance(f, basestring):
@@ -88,8 +85,6 @@ class PdfBackend(ImageBackend):
 
 
 class OfficeBackend(PdfBackend):
-    # TODO: perhaps import unoconv and use some of it's internals.
-    # Particularly it would be nice to use a persistent server (OO.org/LibreOffice).
     def __init__(self, connection=None, width=DEFAULT_WIDTH, height=DEFAULT_HEIGHT):
         from . import unoclient
         super(OfficeBackend, self).__init__(width, height)
@@ -101,7 +96,6 @@ class OfficeBackend(PdfBackend):
         self.client = unoclient.Client(connection)
 
     def create(self, f):
-        args = list(UC_ARGS)
         if not isinstance(f, basestring):
             o, fname = tempfile.mkstemp()
             try:
