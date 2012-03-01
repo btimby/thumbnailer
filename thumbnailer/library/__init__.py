@@ -113,7 +113,7 @@ class OfficeBackend(PdfBackend):
     for conversion to an image."""
     def create(self, f, file_name='', width=None, height=None):
         # Get an UNO client from the pool.
-        with client() as client:
+        with client() as uno:
             if not isinstance(f, basestring):
                 if hasattr(f, 'name'):
                     f = f.name
@@ -127,7 +127,7 @@ class OfficeBackend(PdfBackend):
                     finally:
                         f.close()
                     f = t.name
-            pdf = client.export_to_pdf(f)
+            pdf = uno.export_to_pdf(f)
         return super(OfficeBackend, self).create(pdf.getStream(), width=width, height=height)
 
 
