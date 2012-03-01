@@ -26,10 +26,13 @@ FF_ARGS = (
 def create(f, **kwargs):
     """A convenience function to determine the correct backend, instantiate
     it, then ask it to create a thumbnail."""
+    file_name = kwargs.pop('file_name', getattr(f, 'name', None))
     if isinstance(f, basestring):
         ext = os.path.splitext(f)[1]
     else:
-        ext = os.path.splitext(getattr(f, 'name'))[1]
+        if file_name is None:
+            raise Exception('File name must be provided for type detection')
+        ext = os.path.splitext(file_name)[1]
     backend = None
     for klass, extensions in BACKEND_SUPPORT.items():
         if ext in extensions:
@@ -37,7 +40,7 @@ def create(f, **kwargs):
             break
     if backend is None:
         raise Exception('Unsupported format {0}'.format(ext))
-    return backend.create(f)
+    return backend.create(f, file_name=file_name)
 
 
 class ImageBackend(object):
@@ -47,9 +50,11 @@ class ImageBackend(object):
         self.width = width
         self.height = height
 
-    def create(self, f):
+    def create(self, f, file_name='', width=None, height=None):
+        width = width or self.width
+        height = height or self.height
         image = Image.open(f)
-        image.thumbnail((self.width, self.height), Image.ANTIALIAS)
+        image.thumbnail((width, height), Image.ANTIALIAS)
         thumb = StringIO()
         image.save(thumb, 'png')
         thumb.seek(0)
@@ -59,58 +64,71 @@ class ImageBackend(object):
 class VideoBackend(ImageBackend):
     """A backend that uses the ffmpeg command to grab the first frame of a video
     to an image. That image is then sent upstream to the ImageBackend for resizing."""
-    def create(self, f):
+    def create(self, f, file_name='', width=None, height=None):
         args = list(FF_ARGS)
-        if isinstance(f, basestring):
-            args.extend(('-i', str(f)))
-            input = None
-        else:
-            args.extend(('-i', ' pipe:0'))
-            input = f.read()
-        o, fname = tempfile.mkstemp(suffix='.png')
-        os.close(o)
-        args.append(fname)
-        stdout, stderr = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate(input)
-        return super(VideoBackend, self).create(fname)
+        if not isinstance(f, basestring):
+            if hasattr(f, 'name'):
+                f = f.name
+            else:
+                type = os.path.splitext(file_name)[1]
+                t = tempfile.NamedTemporaryFile(suffix=type)
+                try:
+                    shutil.copyfileobj(f, t)
+                    t.flush()
+                finally:
+                    f.close()
+                f = t.name
+        args.extend(('-i', f))
+        o = tempfile.NamedTemporaryFile(suffix='.png')
+        args.append(o.name)
+        stdout, stderr = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+        return super(VideoBackend, self).create(o, width=width, height=height)
 
 
 class PdfBackend(ImageBackend):
     """A backend that uses GhostScript to convert the first page of a PDF into
     an image. That image is then sent upstream to the ImageBackend for resizing."""
-    def create(self, f):
+    def create(self, f, file_name='', width=None, height=None):
         args = list(GS_ARGS)
         if not isinstance(f, basestring):
-            o, fname = tempfile.mkstemp()
-            try:
-                with os.fdopen(o, 'w') as o:
-                    shutil.copyfileobj(f, o)
-            finally:
-                f.close()
-            f = fname
+            if hasattr(f, 'name'):
+                f = f.name
+            else:
+                # Convert a file-like object to a file on disk.
+                t = tempfile.NamedTemporaryFile(suffix='.pdf')
+                try:
+                    shutil.copyfileobj(f, t)
+                    t.flush()
+                finally:
+                    f.close()
+                f = t.name
         args.append(f)
         stdout, stderr = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-        return super(PdfBackend, self).create(StringIO(stdout))
+        return super(PdfBackend, self).create(StringIO(stdout), width=width, height=height)
 
 
 class OfficeBackend(PdfBackend):
     """A backend that communicates with OO.o/LibreOffice via UNO. The office suite
     converts the document to a PDF, which is then sent upstream to the PdfBackend
     for conversion to an image."""
-    def create(self, f):
+    def create(self, f, file_name='', width=None, height=None):
         # Get an UNO client from the pool.
         with unoclient.client() as client:
             if not isinstance(f, basestring):
-                o, fname = tempfile.mkstemp()
-                try:
-                    with os.fdopen(o, 'w') as o:
-                        shutil.copyfileobj(f, o)
-                finally:
-                    f.close()
-                f = fname
-            o, fname = tempfile.mkstemp()
-            os.close(o)
+                if hasattr(f, 'name'):
+                    f = f.name
+                else:
+                    # Convert a file-like object to a file on disk.
+                    type = os.path.splitext(file_name)[1]
+                    t = tempfile.NamedTemporaryFile(suffix=type)
+                    try:
+                        shutil.copyfileobj(f, t)
+                        t.flush()
+                    finally:
+                        f.close()
+                    f = t.name
             pdf = client.export_to_pdf(f)
-        return super(OfficeBackend, self).create(pdf.getStream())
+        return super(OfficeBackend, self).create(pdf.getStream(), width=width, height=height)
 
 
 BACKEND_SUPPORT = {

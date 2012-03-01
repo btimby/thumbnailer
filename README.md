@@ -9,14 +9,20 @@ process.
 Conversion Library
 ----
 
-If you are only creating one thumbnail, you can use the library directly. The startup cost is
-high, so if you are creating more than one thumbnail, read the next section about the conversion
-server.
+The library returns the thumbnail as a StringIO instance containing a .png image.
+
+If you are only creating one thumbnail, you can use the library directly. For the first thumbnail
+a connection is opened to OO.o/LibreOffice. This can take some time, so the first thumbnail may
+take several seconds to create. However, connections are pooled, so any subsequent thumbnails of
+office documents will automatically reuse an existing connection.
 
 ```python
 from thumbnailer import library as thumb
 
-thumb.create('path_to.png')
+# Use the default width and height:
+image = thumb.create('path_to.png')
+# Specify the optional width and height (default is 128x128):
+image = thumb.create('path_to.png', width=100, height=200)
 ```
 
 The create function will detect the file type and create a thumbnail for it. It will use one or a
@@ -28,37 +34,51 @@ and use it directly.
 ```python
 from thumbnailer import library as thumb
 
+# Use the default width and height:
 backend = thumb.OfficeBackend()
-backend.create('path_to.docx')
+image = backend.create('path_to.docx')
+
+# Specify the width and height:
+backend = thumb.OfficeBackend(width=100, height=200)
+image = backend.create('path_to.docx')
 ```
 
-There are three backends.
+There are four backends. Python inheritance is used to provide a step by step conversion from the
+given file to the desired image.
 
-- OfficeBackend - Converts an office document to a PDF. This backend used UNO and OO.org/LibreOffice.
-- PdfBackend - Converts a PDF to an Image. This backend uses GhostScript.
 - ImageBackend - Converts an image to a smaller thumbnail image. This backend uses PIL.
+    - PdfBackend - Converts a PDF to an Image. This backend uses GhostScript.
+        - OfficeBackend - Converts an office document to a PDF. This backend used UNO and OO.org/LibreOffice.
+    - VideoBackend - Converts a video to an image by grabbing the first frame.
 
-So, if you use the high level thumbnailer.library.create() function on a .docx file, all three
-backends will be utilized. If you instead pass in a PDF file, only the PDFBackend and ImageBackend
-will be used. For an image file, only the ImageBackend is necessary.
+If you use the OfficeBackend, it will convert the office document to a one page PDF file, then pass
+the result to it's base class PdfBackend to convert that to an image. The resulting image will then
+be handed off to the base class ImageBackend for final resize into a thumbnail.
 
 Conversion Server REST API
 ----
 
+As is often the case, thumbnail creation requiring a running instance of OO.o/LibreOffice is not always
+something you want to do on your webserver. Thus, if you are planning to use this package in conjunction
+with a Django web application, you can also use the client/server model.
+
 In addition to the conversion library, this package provides a simple asynchronous HTTP server that
-does the conversion of documents to images. This HTTP server supports a simple REST API for
-performing conversions. The server should be used when you plan on creating many thumbnails. Using
-the server incurs the startup cost only once and is able to quickly generate thumbnails afterwards.
+does the conversion of documents to images. This HTTP server supports a simple REST API for performing
+conversions. There is also a client provided for use in your web application. This server has not been
+audited for security problems, so it is not suggested that you expose it to your users via the Internet.
 
 The conversion server can receive jobs via either a POST or GET request.
 
-A POST is expected to provide a Content-Type header indicateing the document format. The request
+A POST is expected to provide a Content-Type header indicating the document format. The request
 body should contain the document itself.
 
 A GET request should provide a URL that is accessible to the conversion server. That is, the URL
 should be valid for the conversion server to read the document. The format will be determined
 by the file's extension. file:// is a valid scheme for the URL, in which case, the document is
 read directly from disk.
+
+In either case, the width and height can optionally be provided on the query string. If omitted, the
+default of 128x128 is used.
 
 The following flow illustrates what happens within the conversion server in response to either a
 POST or GET request.
@@ -74,7 +94,6 @@ file. For a file:// URL, this step is skipped.
 
 POST or GET:
 
-- The document is submitted to the office suite for conversion to PDF.
-- The PDF file is provided to ghostscript for conversion to PNG.
-- The PNG file is returned to the caller.
-- Temporary files are cleaned up after handling the request.
+- The proper backend is selected and the .png file is returned to the caller.
+- Headers are included to control upstream caching.
+- Any temporary files are cleaned up after handling the request.
