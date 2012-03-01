@@ -28,23 +28,31 @@ image = thumb.create('path_to.png', width=100, height=200)
 The create function will detect the file type and create a thumbnail for it. It will use one or a
 combination of several backends to create the thumbnail.
 
+The first argument can be a path, or a file-like object. If the file-like object is actually an open
+file or other file-like object with a `name` attribute, that attribute will be used for type detection.
+Otherwise, you can must provide the optional `file_name` parameter, which will be used for type
+detection.
+
 If for some reason, you want more control over what backend is used, you can instantiate a backend
 and use it directly.
 
 ```python
-from thumbnailer import library as thumb
+from thumbnailer.library import OfficeBackend
 
 # Use the default width and height:
-backend = thumb.OfficeBackend()
+backend = OfficeBackend()
 image = backend.create('path_to.docx')
 
-# Specify the width and height:
-backend = thumb.OfficeBackend(width=100, height=200)
+# Specify the width and height for backend:
+backend = OfficeBackend(width=100, height=200)
 image = backend.create('path_to.docx')
+
+# Override the width and height when calling create()
+image = backend.create('path_to.docx', width=200, height=300)
 ```
 
 There are four backends. Python inheritance is used to provide a step by step conversion from the
-given file to the desired image.
+given file to the desired thumbnail image.
 
 - ImageBackend - Converts an image to a smaller thumbnail image. This backend uses PIL.
     - PdfBackend - Converts a PDF to an Image. This backend uses GhostScript.
