@@ -1,7 +1,7 @@
 import os, subprocess, tempfile, shutil
 from PIL import Image
-from .unoclient import client
-from .compat import StringIO
+from unoclient import client
+from compat import StringIO
 
 DEFAULT_WIDTH, DEFAULT_HEIGHT = 128, 128
 GS_ARGS = (
@@ -113,7 +113,8 @@ class OfficeBackend(PdfBackend):
     for conversion to an image."""
     def create(self, f, file_name='', width=None, height=None):
         # Get an UNO client from the pool.
-        with client() as uno:
+        uno = client()
+        try:
             if not isinstance(f, basestring):
                 if hasattr(f, 'name'):
                     f = f.name
@@ -128,6 +129,8 @@ class OfficeBackend(PdfBackend):
                         f.close()
                     f = t.name
             pdf = uno.export_to_pdf(f)
+        finally:
+            uno.close()
         return super(OfficeBackend, self).create(pdf.getStream(), width=width, height=height)
 
 

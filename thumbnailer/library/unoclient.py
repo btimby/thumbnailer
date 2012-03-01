@@ -1,16 +1,39 @@
-import os, sys, random, threading, time
+import os, sys, random, threading, time, glob
+import warnings
+from compat import StringIO
+
+searchpaths = glob.glob('/opt/openoffice.org*/basis*/program')
+
 try:
     import uno
-    from unohelper import Base, systemPathToFileUrl
-    from com.sun.star.beans import PropertyValue
-    from com.sun.star.connection import NoConnectException
-    from com.sun.star.io import IOException, XOutputStream
 except ImportError:
-    raise Exception('Document thumbnailing requires OO.o/LibreOffice and python-uno')
-from .compat import StringIO
+    uno = None
+    for path in searchpaths:
+        if not os.path.exists(os.path.join(path, 'uno.py')):
+            continue
+        # We found our directory...
+        sys.path.insert(0, path)
+        try:
+            import uno
+            if not sys.executable.startswith(path):
+                warnings.warn('You are not running the python interpreter from with OOo. Bad things might happen real soon...')
+            for path in 
+            os.environ['LD_LIBRARY_PATH'] = path + os.pathsep + os.environ.get('LD_LIBRARY_PATH', '')
+            break
+        except ImportError:
+            sys.path.remove(path)
+    if uno is None:
+        raise Exception('Document thumbnailing requires OO.o/LibreOffice and python-uno')
+
+from unohelper import Base, systemPathToFileUrl
+from com.sun.star.beans import PropertyValue
+from com.sun.star.connection import NoConnectException
+from com.sun.star.io import IOException, XOutputStream
 
 # Taken from example:
 # http://www.openoffice.org/udk/python/samples/ooextract.py
+# Also very useful for PDF specifics:
+# http://user.services.openoffice.org/en/forum/viewtopic.php?f=44&t=1804
 
 SOFFICE_INSTRUCTIONS = """
 # To run in Foreground:
@@ -140,7 +163,7 @@ class Pool(object):
         self.lock.acquire()
         try:
             clients = self.clients.setdefault(connection, [])
-            unused = filter(lambda x: not x.in_use.is_set(), clients)
+            unused = filter(lambda x: not x.in_use.isSet(), clients)
             if unused:
                 # Select a random unused client:
                 client = random.choice(unused)

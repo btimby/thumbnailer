@@ -6,8 +6,8 @@ from thumbnailer.library.compat import StringIO
 class ThumbnailerTestCase(unittest.TestCase):
     def assertDimensions(self, t):
         w, h = Image.open(t).size
-        self.assertLessEqual(w, thumb.DEFAULT_WIDTH)
-        self.assertLessEqual(h, thumb.DEFAULT_HEIGHT)
+        self.assertTrue(w <= thumb.DEFAULT_WIDTH)
+        self.assertTrue(h <= thumb.DEFAULT_HEIGHT)
 
     def test_pdf(self):
         t = thumb.create('files/test.pdf')
