@@ -2,6 +2,7 @@ import os, sys, random, threading, time, glob
 import warnings
 from compat import StringIO
 
+# Loosely based on what unoconv does, Thanks Dag!
 searchpaths = glob.glob('/opt/openoffice.org*/basis*/program')
 
 try:
@@ -17,7 +18,6 @@ except ImportError:
             import uno
             if not sys.executable.startswith(path):
                 warnings.warn('You are not running the python interpreter from with OOo. Bad things might happen real soon...')
-            for path in 
             os.environ['LD_LIBRARY_PATH'] = path + os.pathsep + os.environ.get('LD_LIBRARY_PATH', '')
             break
         except ImportError:

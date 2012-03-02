@@ -1,4 +1,4 @@
-import os, subprocess, tempfile, shutil
+import os, subprocess, tempfile, shutil, zipfile
 from PIL import Image
 from unoclient import client
 from compat import StringIO
@@ -107,7 +107,14 @@ class PdfBackend(ImageBackend):
         return super(PdfBackend, self).create(StringIO(stdout), width=width, height=height)
 
 
-class OfficeBackend(PdfBackend):
+class OfficeBackend(ImageBackend):
+    def create(self, f, file_name='', width=None, height=None):
+        # Extract: 'Thumbnails/thumbnail.png'
+        png = StringIO(zipfile.ZipFile(f, 'r').read('Thumbnails/thumbnail.png', 'r'))
+        return super(OfficeBackend, self).create(png, width=width, height=height)
+
+
+class UnoBackend(PdfBackend):
     """A backend that communicates with OO.o/LibreOffice via UNO. The office suite
     converts the document to a PDF, which is then sent upstream to the PdfBackend
     for conversion to an image."""
@@ -131,7 +138,7 @@ class OfficeBackend(PdfBackend):
             pdf = uno.export_to_pdf(f)
         finally:
             uno.close()
-        return super(OfficeBackend, self).create(pdf.getStream(), width=width, height=height)
+        return super(UnoBackend, self).create(pdf.getStream(), width=width, height=height)
 
 
 BACKEND_SUPPORT = {
@@ -144,11 +151,14 @@ BACKEND_SUPPORT = {
         '.mpg', '.mpeg', '.avi', '.wmv', '.mkv', '.fli', '.flc', '.flv', '.ac3',
         '.cin', '.vob'
     ),
+    OfficeBackend: (
+        '.odt', '.ods', '.odp', 
+    ),
     PdfBackend: (
         '.pdf',
     ),
-    OfficeBackend: (
-        '.odt', '.ods', '.odp', '.dot', '.docm', '.dotx', '.dotm', '.psw'
+    UnoBackend: (
+        '.dot', '.docm', '.dotx', '.dotm', '.psw'
         '.doc', '.xls', '.ppt', '.wpd', '.wps', '.csv', '.sdw', '.sgl', '.vor'
         '.docx', '.xlsx', '.pptx', '.xlsm', '.xltx', '.xltm', '.xlt', '.xlw', '.dif'
         '.rtf', '.txt', '.pxl'
