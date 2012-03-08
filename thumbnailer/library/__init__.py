@@ -23,24 +23,33 @@ FF_ARGS = (
 )
 "Default arguments used with ffmpeg."
 
-def create(f, **kwargs):
-    """A convenience function to determine the correct backend, instantiate
-    it, then ask it to create a thumbnail."""
-    file_name = kwargs.pop('file_name', getattr(f, 'name', None))
-    if isinstance(f, basestring):
-        ext = os.path.splitext(f)[1]
-    else:
-        if file_name is None:
-            raise Exception('File name must be provided for type detection')
-        ext = os.path.splitext(file_name)[1]
+def get_backend(file_name):
+    ext = os.path.splitext(file_name)[1]
+    ext = ext.lower()
     backend = None
     for klass, extensions in BACKEND_SUPPORT.items():
         if ext in extensions:
-            backend = klass(**kwargs)
-            break
-    if backend is None:
-        raise Exception('Unsupported format {0}'.format(ext))
-    return backend.create(f, file_name=file_name)
+            return klass
+
+def get(f, **kwargs):
+    """A convenience function to determine the correct backend, instantiate
+    it, then ask it to create a thumbnail."""
+    default = kwargs.pop('default', None)
+    file_name = kwargs.pop('file_name', getattr(f, 'name', None))
+    try:
+        if isinstance(f, basestring):
+            file_name = f
+        else:
+            if file_name is None:
+                raise Exception('File name must be provided for type detection')
+        backend = get_backend(file_name)
+        if backend is None:
+            raise Exception('Unsupported format {0}'.format(ext))
+        return backend(**kwargs).get(f, file_name=file_name)
+    except:
+        if default:
+            return default
+        raise
 
 
 class ImageBackend(object):
@@ -50,7 +59,7 @@ class ImageBackend(object):
         self.width = width
         self.height = height
 
-    def create(self, f, file_name='', width=None, height=None):
+    def get(self, f, file_name='', width=None, height=None):
         width = width or self.width
         height = height or self.height
         image = Image.open(f)
@@ -64,7 +73,7 @@ class ImageBackend(object):
 class VideoBackend(ImageBackend):
     """A backend that uses the ffmpeg command to grab the first frame of a video
     to an image. That image is then sent upstream to the ImageBackend for resizing."""
-    def create(self, f, file_name='', width=None, height=None):
+    def get(self, f, file_name='', width=None, height=None):
         args = list(FF_ARGS)
         if not isinstance(f, basestring):
             if hasattr(f, 'name'):
@@ -82,13 +91,13 @@ class VideoBackend(ImageBackend):
         o = tempfile.NamedTemporaryFile(suffix='.png')
         args.append(o.name)
         stdout, stderr = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-        return super(VideoBackend, self).create(o, width=width, height=height)
+        return super(VideoBackend, self).get(o, width=width, height=height)
 
 
 class PdfBackend(ImageBackend):
     """A backend that uses GhostScript to convert the first page of a PDF into
     an image. That image is then sent upstream to the ImageBackend for resizing."""
-    def create(self, f, file_name='', width=None, height=None):
+    def get(self, f, file_name='', width=None, height=None):
         args = list(GS_ARGS)
         if not isinstance(f, basestring):
             if hasattr(f, 'name'):
@@ -104,21 +113,27 @@ class PdfBackend(ImageBackend):
                 f = t.name
         args.append(f)
         stdout, stderr = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-        return super(PdfBackend, self).create(StringIO(stdout), width=width, height=height)
+        return super(PdfBackend, self).get(StringIO(stdout), width=width, height=height)
 
 
 class OfficeBackend(ImageBackend):
-    def create(self, f, file_name='', width=None, height=None):
+    def get(self, f, file_name='', width=None, height=None):
+        # ZipFile requires seek:
+        if not isinstance(f, basestring) and not hasattr(f, 'seek'):
+            d = StringIO()
+            shutil.copyfileobj(f, d)
+            d.seek(0)
+            f = d
         # Extract: 'Thumbnails/thumbnail.png'
         png = StringIO(zipfile.ZipFile(f, 'r').read('Thumbnails/thumbnail.png', 'r'))
-        return super(OfficeBackend, self).create(png, width=width, height=height)
+        return super(OfficeBackend, self).get(png, width=width, height=height)
 
 
 class UnoBackend(PdfBackend):
     """A backend that communicates with OO.o/LibreOffice via UNO. The office suite
     converts the document to a PDF, which is then sent upstream to the PdfBackend
     for conversion to an image."""
-    def create(self, f, file_name='', width=None, height=None):
+    def get(self, f, file_name='', width=None, height=None):
         # Get an UNO client from the pool.
         uno = client()
         try:
@@ -138,7 +153,7 @@ class UnoBackend(PdfBackend):
             pdf = uno.export_to_pdf(f)
         finally:
             uno.close()
-        return super(UnoBackend, self).create(pdf.getStream(), width=width, height=height)
+        return super(UnoBackend, self).get(pdf.getStream(), width=width, height=height)
 
 
 BACKEND_SUPPORT = {
@@ -158,10 +173,10 @@ BACKEND_SUPPORT = {
         '.pdf',
     ),
     UnoBackend: (
-        '.dot', '.docm', '.dotx', '.dotm', '.psw'
-        '.doc', '.xls', '.ppt', '.wpd', '.wps', '.csv', '.sdw', '.sgl', '.vor'
-        '.docx', '.xlsx', '.pptx', '.xlsm', '.xltx', '.xltm', '.xlt', '.xlw', '.dif'
-        '.rtf', '.txt', '.pxl'
+        '.dot', '.docm', '.dotx', '.dotm', '.psw',
+        '.doc', '.xls', '.ppt', '.wpd', '.wps', '.csv', '.sdw', '.sgl', '.vor',
+        '.docx', '.xlsx', '.pptx', '.xlsm', '.xltx', '.xltm', '.xlt', '.xlw', '.dif',
+        '.rtf', '.txt', '.pxl',
     )
 }
 "Maps backends to the file extensions they support."

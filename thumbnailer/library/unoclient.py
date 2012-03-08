@@ -37,10 +37,10 @@ from com.sun.star.io import IOException, XOutputStream
 
 SOFFICE_INSTRUCTIONS = """
 # To run in Foreground:
-$ soffice --accept=socket,host=localhost,port=2002;urp;
+$ soffice --accept="socket,host=localhost,port=2002;urp;"
 
 # To run headless:
-$ soffice --accept=socket,host=localhost,port=2002;urp; --headless --invisible --nocrashreport --nodefault --nofirststartwizard --nologo --norestore
+$ soffice --accept="socket,host=localhost,port=2002;urp;" --headless --invisible --nocrashreport --nodefault --nofirststartwizard --nologo --norestore
 
 # Then set environment:
 $ export UNO_CONNECTION="uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext"
